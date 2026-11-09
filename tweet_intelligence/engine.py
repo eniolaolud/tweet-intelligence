@@ -54,6 +54,18 @@ class TweetIntelligenceEngine:
     def follow(self, username: str) -> str:
         return self.client.follow_user(username)
 
+    def analyze_text(self, text: str, *, persist: bool = False) -> dict[str, object]:
+        """Analyze sentence structure with NLTK; optionally store words/patterns."""
+        result = self.analyzer.analyze(text)
+        if persist and result.tokens:
+            self.storage.record_words(result.tokens)
+            if result.structure:
+                self.storage.record_structure(result.structure)
+        return {
+            "tokens": result.tokens,
+            "structure": result.structure,
+        }
+
     def generate(self, count: int = 1) -> list[str]:
         return self.generator.generate(count=count)
 

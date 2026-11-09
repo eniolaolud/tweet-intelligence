@@ -16,10 +16,16 @@ def build_parser() -> argparse.ArgumentParser:
             "then generate new tweets from those patterns."
         ),
     )
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--mock",
         action="store_true",
         help="Force offline/demo mode (sample data, no Twitter credentials needed).",
+    )
+    mode.add_argument(
+        "--live",
+        action="store_true",
+        help="Force live Twitter API mode (requires credentials in env / .env).",
     )
     parser.add_argument(
         "--db",
@@ -29,22 +35,45 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command", required=True)
 
-    fetch = sub.add_parser("fetch-timeline", help="Fetch home timeline and learn from it.")
+    fetch = sub.add_parser(
+        "fetch-timeline",
+        help="Fetch home timeline via Twitter API and learn from it.",
+    )
     fetch.add_argument("--limit", type=int, default=20, help="Max tweets to fetch (default 20).")
 
-    user = sub.add_parser("fetch-user", help="Fetch a user's recent tweets and learn from them.")
+    user = sub.add_parser(
+        "fetch-user",
+        help="Fetch a user's timeline via Twitter API and learn from it.",
+    )
     user.add_argument("username", help="Twitter username (with or without @).")
     user.add_argument("--limit", type=int, default=20, help="Max tweets to fetch (default 20).")
 
-    follow = sub.add_parser("follow", help="Follow a Twitter user.")
+    follow = sub.add_parser(
+        "follow",
+        help="Follow a Twitter user via the Twitter API (OAuth user context required).",
+    )
     follow.add_argument("username", help="Twitter username (with or without @).")
 
     analyze = sub.add_parser(
+        "analyze",
+        help="Analyze sentence structure of text with NLTK (optionally persist words/patterns).",
+    )
+    analyze.add_argument("text", help="Sentence or tweet text to analyze.")
+    analyze.add_argument(
+        "--store",
+        action="store_true",
+        help="Persist encountered words and the sentence structure into SQLite.",
+    )
+
+    demo = sub.add_parser(
         "analyze-demo",
         help="Load sample tweets, analyze them, and store words/structures (always offline).",
     )
 
-    gen = sub.add_parser("generate", help="Generate tweets from learned words and patterns.")
+    gen = sub.add_parser(
+        "generate",
+        help="Generate tweets from encountered words and learned sentence structures.",
+    )
     gen.add_argument("-n", "--count", type=int, default=3, help="How many tweets to generate.")
 
     sub.add_parser("stats", help="Show counts of stored tweets, words, and structures.")
@@ -59,6 +88,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _resolve_mock_flag(args: argparse.Namespace) -> bool | None:
+    if args.command == "analyze-demo":
+        return True
+    if args.mock:
+        return True
+    if args.live:
+        return False
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -66,17 +105,7 @@ def main(argv: list[str] | None = None) -> int:
     from tweet_intelligence.storage.database import Storage
 
     storage = Storage(db_path=args.db) if args.db else Storage()
-
-    # analyze-demo always uses mock sample data.
-    mock_flag: bool | None
-    if args.command == "analyze-demo":
-        mock_flag = True
-    elif args.mock:
-        mock_flag = True
-    else:
-        mock_flag = None
-
-    engine = TweetIntelligenceEngine(storage=storage, mock=mock_flag)
+    engine = TweetIntelligenceEngine(storage=storage, mock=_resolve_mock_flag(args))
 
     if args.command == "fetch-timeline":
         n = engine.fetch_timeline(max_results=args.limit)
@@ -93,6 +122,22 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "follow":
         message = engine.follow(args.username)
         print(message)
+        return 0
+
+    if args.command == "analyze":
+        result = engine.analyze_text(args.text, persist=args.store)
+        tokens = result["tokens"]
+        structure = result["structure"]
+        if not tokens:
+            print("No analyzable words found in that text.")
+            return 0
+        print("Tokens (word / POS):")
+        for word, pos in tokens:  # type: ignore[misc]
+            print(f"  {word:20s}  {pos}")
+        print(f"Sentence structure: {structure}")
+        if args.store:
+            print("Stored words and structure in SQLite.")
+            _print_stats(engine)
         return 0
 
     if args.command == "analyze-demo":
@@ -122,7 +167,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "show-words":
         if args.pos:
-            rows = [(w, args.pos, c) for w, c in storage.get_words_by_pos(args.pos, limit=args.limit)]
+            rows = [
+                (w, args.pos, c)
+                for w, c in storage.get_words_by_pos(args.pos, limit=args.limit)
+            ]
         else:
             rows = storage.get_all_words(limit=args.limit)
         if not rows:

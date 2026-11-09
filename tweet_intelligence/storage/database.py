@@ -123,6 +123,7 @@ class Storage:
         self._conn.commit()
 
     def get_words_by_pos(self, pos: str, limit: int = 50) -> list[tuple[str, int]]:
+        """Indexed POS lookup (idx_words_pos) ordered by frequency for generation."""
         rows = self._conn.execute(
             """
             SELECT word, count FROM words
@@ -131,6 +132,21 @@ class Storage:
             LIMIT ?
             """,
             (pos, limit),
+        ).fetchall()
+        return [(row["word"], row["count"]) for row in rows]
+
+    def get_words_by_pos_prefix(
+        self, pos_prefix: str, limit: int = 50
+    ) -> list[tuple[str, int]]:
+        """Retrieve words whose POS tag starts with ``pos_prefix`` (e.g. 'NN' → NN/NNS/NNP)."""
+        rows = self._conn.execute(
+            """
+            SELECT word, count FROM words
+            WHERE pos = ? OR pos LIKE ?
+            ORDER BY count DESC, word ASC
+            LIMIT ?
+            """,
+            (pos_prefix, f"{pos_prefix}%", limit),
         ).fetchall()
         return [(row["word"], row["count"]) for row in rows]
 
@@ -146,6 +162,7 @@ class Storage:
         return [(row["word"], row["pos"], row["count"]) for row in rows]
 
     def get_structures(self, limit: int = 50) -> list[tuple[str, int]]:
+        """Indexed frequency lookup of sentence structures for generation."""
         rows = self._conn.execute(
             """
             SELECT pattern, count FROM structures
@@ -155,6 +172,17 @@ class Storage:
             (limit,),
         ).fetchall()
         return [(row["pattern"], row["count"]) for row in rows]
+
+    def index_names(self) -> list[str]:
+        """Return created index names (used to verify efficient retrieval setup)."""
+        rows = self._conn.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type = 'index' AND sql IS NOT NULL
+            ORDER BY name
+            """
+        ).fetchall()
+        return [row["name"] for row in rows]
 
     def tweet_count(self) -> int:
         row = self._conn.execute("SELECT COUNT(*) AS n FROM tweets").fetchone()

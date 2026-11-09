@@ -148,6 +148,7 @@ class LiveTwitterClient:
             tweet_fields=["author_id"],
             expansions=["author_id"],
             user_fields=["username"],
+            user_auth=True,
         )
         return self._normalize(response)
 
@@ -179,16 +180,15 @@ class LiveTwitterClient:
                 "TWITTER_ACCESS_TOKEN_SECRET)."
             )
         username = username.lstrip("@")
-        me = self._client.get_me()
+        # Confirm the authenticated user context is valid before following.
+        me = self._client.get_me(user_auth=True)
         if not me or not me.data:
             raise RuntimeError("Could not resolve authenticated user (get_me).")
-        target = self._client.get_user(username=username)
+        target = self._client.get_user(username=username, user_auth=True)
         if not target or not target.data:
             raise RuntimeError(f"User @{username} not found.")
-        self._client.follow_user(
-            source_user_id=me.data.id,
-            target_user_id=target.data.id,
-        )
+        # tweepy Client.follow_user takes target_user_id only (auth user is implied).
+        self._client.follow_user(target_user_id=target.data.id, user_auth=True)
         return f"Now following @{username}"
 
     @staticmethod

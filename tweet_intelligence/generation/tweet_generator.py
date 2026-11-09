@@ -31,7 +31,13 @@ _FALLBACK_WORDS: dict[str, list[str]] = {
 
 
 class TweetGenerator:
-    """Build short tweets from stored words + sentence structures."""
+    """Build short tweets from stored words + sentence structures.
+
+    Generation always prefers SQL-backed retrieval:
+    1. Sample a sentence structure by stored frequency
+    2. For each POS slot, sample a word via indexed ``get_words_by_pos``
+    Fallbacks are used only when the database has no matching rows yet.
+    """
 
     def __init__(self, storage: Storage, rng: random.Random | None = None) -> None:
         self.storage = storage
@@ -44,11 +50,8 @@ class TweetGenerator:
     def _one(self) -> str:
         pattern = self._pick_pattern()
         tags = pattern.split()
-        words: list[str] = []
-        for tag in tags:
-            words.append(self._pick_word(tag))
+        words = [self._pick_word(tag) for tag in tags]
         tweet = " ".join(words).strip()
-        # Light capitalization for readability.
         if tweet:
             tweet = tweet[0].upper() + tweet[1:]
         return tweet
@@ -61,24 +64,19 @@ class TweetGenerator:
         return self.rng.choice(_FALLBACK_PATTERNS)
 
     def _pick_word(self, pos: str) -> str:
+        # Primary path: efficient indexed retrieval by exact POS tag.
         options = self.storage.get_words_by_pos(pos, limit=100)
         if options:
             words, weights = zip(*options)
             return self.rng.choices(list(words), weights=list(weights), k=1)[0]
-        # Broaden: try a coarse POS family (first two chars of Penn tag).
+
+        # Secondary path: same POS family (e.g. NN ≈ NNS) via SQL LIKE on pos.
         coarse = pos[:2]
-        for word, tag, _count in self.storage.get_all_words(limit=200):
-            if tag.startswith(coarse) or tag == pos:
-                # Collect matching on the fly once if exact POS was empty.
-                pass
-        coarse_matches = [
-            (word, count)
-            for word, tag, count in self.storage.get_all_words(limit=200)
-            if tag == pos or tag.startswith(coarse)
-        ]
+        coarse_matches = self.storage.get_words_by_pos_prefix(coarse, limit=100)
         if coarse_matches:
             words, weights = zip(*coarse_matches)
             return self.rng.choices(list(words), weights=list(weights), k=1)[0]
+
         fallback = _FALLBACK_WORDS.get(pos) or _FALLBACK_WORDS.get(coarse)
         if fallback:
             return self.rng.choice(fallback)
