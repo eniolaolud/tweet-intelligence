@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tweet-intelligence"
+version = "0.1.0"
+description = "Learner-friendly Tweet Intelligence Engine: Twitter API, NLTK analysis, SQL storage, generation."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "tweepy>=4.14.0",
+  "nltk>=3.8.1",
+  "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4.0"]
+
+[project.scripts]
+tweet-intelligence = "tweet_intelligence.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tweet_intelligence*"]
+
+[tool.setuptools.package-data]
+tweet_intelligence = ["sample_data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
