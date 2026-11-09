@@ -1,0 +1,52 @@
+[
+  {
+    "id": "sample-001",
+    "author": "learnerbot",
+    "text": "I love building simple Python projects that teach real skills."
+  },
+  {
+    "id": "sample-002",
+    "author": "learnerbot",
+    "text": "This morning feels bright and full of curious ideas."
+  },
+  {
+    "id": "sample-003",
+    "author": "codegarden",
+    "text": "We need clean structure when we store words and patterns."
+  },
+  {
+    "id": "sample-004",
+    "author": "codegarden",
+    "text": "NLTK quietly tags each sentence so generation can reuse it."
+  },
+  {
+    "id": "sample-005",
+    "author": "datastroll",
+    "text": "A good database keeps retrieval fast and learning persistent."
+  },
+  {
+    "id": "sample-006",
+    "author": "datastroll",
+    "text": "They enjoy short tweets that still show clear sentence structure."
+  },
+  {
+    "id": "sample-007",
+    "author": "patternsmith",
+    "text": "Python is a friendly language for language experiments."
+  },
+  {
+    "id": "sample-008",
+    "author": "patternsmith",
+    "text": "I found a great idea while reading the home timeline."
+  },
+  {
+    "id": "sample-009",
+    "author": "learnerbot",
+    "text": "You often learn more when you follow thoughtful writers."
+  },
+  {
+    "id": "sample-010",
+    "author": "codegarden",
+    "text": "This project seems simple but it teaches useful patterns."
+  }
+]
